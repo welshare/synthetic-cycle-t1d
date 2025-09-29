@@ -1,0 +1,21 @@
+# FHIR resource modeling and validation
+fhir.resources>=7.1.0
+
+# Data manipulation and statistical generation
+pandas>=2.0.0
+numpy>=1.24.0
+scipy>=1.10.0
+
+# Synthetic data generation utilities
+Faker>=20.0.0
+
+# Date/time handling
+python-dateutil>=2.8.0
+
+# Development and testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+
+# Code quality
+black>=23.0.0
+ruff>=0.1.0

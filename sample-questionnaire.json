@@ -1,0 +1,105 @@
+{
+  "resourceType": "Questionnaire",
+  "id": "menstrual-cycle-t1d-questionnaire",
+  "title": "T1D Menstrual Cycle & Glucose Survey",
+  "status": "active",
+  "item": [
+    {
+      "linkId": "1",
+      "text": "Age (years)",
+      "type": "integer",
+      "code": [
+        { "system": "http://loinc.org", "code": "21843-8", "display": "Age" }
+      ]
+    },
+    {
+      "linkId": "2",
+      "text": "How many years since your Type 1 Diabetes diagnosis?",
+      "type": "integer",
+      "code": [
+        { "system": "http://loinc.org", "code": "39016-1", "display": "Years since diagnosis" }
+      ]
+    },
+    {
+      "linkId": "3",
+      "text": "Which insulin delivery method do you use? (Pump or injections)",
+      "type": "choice",
+      "answerOption": [
+        { "valueString": "Insulin Pump" },
+        { "valueString": "Multiple Daily Injections" }
+      ],
+      "code": [
+        { "system": "http://loinc.org", "code": "96706-0", "display": "Insulin delivery method" }
+      ]
+    },
+    {
+      "linkId": "4",
+      "text": "First day of your last menstrual period (LMP)",
+      "type": "date",
+      "code": [
+        { "system": "http://loinc.org", "code": "8665-2", "display": "Last menstrual period start date" }
+      ]
+    },
+    {
+      "linkId": "5",
+      "text": "How regular is your menstrual cycle?",
+      "type": "choice",
+      "answerOption": [
+        { "valueString": "Very regular (predictable)" },
+        { "valueString": "Somewhat regular" },
+        { "valueString": "Irregular" }
+      ],
+      "code": [
+        { "system": "http://loinc.org", "code": "71954-6", "display": "Menstrual cycle pattern" }
+      ]
+    },
+    {
+      "linkId": "6",
+      "text": "What is your average nightly basal insulin dose (units)?",
+      "type": "decimal",
+      "code": [
+        { "system": "http://loinc.org", "code": "96705-2", "display": "Basal insulin dose" }
+      ]
+    },
+    {
+      "linkId": "7",
+      "text": "What was your average nighttime CGM glucose (00:00–06:00) in mg/dL?",
+      "type": "decimal",
+      "code": [
+        { "system": "http://loinc.org", "code": "15074-8", "display": "Glucose [Moles/volume] in Blood" }
+      ]
+    },
+    {
+      "linkId": "8",
+      "text": "How many times do you usually wake up at night (00:00–06:00)?",
+      "type": "integer",
+      "code": [
+        { "system": "http://loinc.org", "code": "80372-6", "display": "Number of awakenings per night" }
+      ]
+    },
+    {
+      "linkId": "9",
+      "text": "Have you experienced any of these symptoms at night? (select all that apply)",
+      "type": "choice",
+      "repeats": true,
+      "answerOption": [
+        { "valueString": "Night sweats" },
+        { "valueString": "Dizziness" },
+        { "valueString": "Palpitations" },
+        { "valueString": "Weakness/Fatigue" }
+      ],
+      "code": [
+        { "system": "http://loinc.org", "code": "42710-6", "display": "Night sweats" },
+        { "system": "http://loinc.org", "code": "9535-0", "display": "Dizziness" },
+        { "system": "http://loinc.org", "code": "49753-3", "display": "Palpitations" },
+        { "system": "http://loinc.org", "code": "83243-4", "display": "Fatigue severity" }
+      ]
+    },
+    {
+      "linkId": "10",
+      "text": "In your own words, have you noticed changes in glucose stability depending on your menstrual cycle phase?",
+      "type": "string"
+    }
+  ]
+}
+

@@ -86,36 +86,48 @@ The questionnaire uses standardized LOINC codes for medical terminology and foll
 ```bash
 source venv/bin/activate
 
-# Small test cohort (10 patients, 40 observations)
-python -m src.main -p 10 -obs 4
+# ONE-PER-PATIENT MODE (Cross-sectional, RECOMMENDED)
+# 187 patients = 187 responses, each in random phase
+python -m src.main -p 187 -i 64 --one-per-patient
 
-# Full demo cohort (187 patients, 748 observations, 64 intervention)
+# Test with smaller cohort
+python -m src.main -p 20 --one-per-patient
+
+# LONGITUDINAL MODE (Multiple observations per patient)
+# 187 patients × 4 observations = 748 responses
 python -m src.main -p 187 -obs 4 -i 64
-
-# Custom parameters
-python -m src.main -p 50 -obs 6 -i 20 --seed 99
 
 # Options:
 #   -p, --num-patients           Number of unique patients (default: 10)
 #   -obs, --observations-per-patient  Observations per patient (default: 4)
 #   -i, --intervention-count     Patients in intervention group (default: 34% of patients)
+#   --one-per-patient            Generate 1 response per patient (cross-sectional)
 #   -o, --output-dir             Output directory (default: output/)
 #   --seed                       Random seed (default: 42)
 #   --no-clean                   Don't delete existing output files
 ```
 
 **Outputs:**
-- Individual JSON files: `output/response-patient-NNNN-obs-NNNN.json`
-- FHIR-compliant with proper resourceType, status, authored timestamp
-- All 10 questionnaire items populated with realistic values
-- Same patient appears in multiple files with consistent demographics
-- LMP dates vary to reflect different cycle phases at observation time
 
-**Data Characteristics:**
+**One-per-patient mode (cross-sectional):**
+- Files: `output/response-patient-NNNN.json`
+- 187 unique patients = **187 total responses**
+- Balanced: ~93 follicular + ~94 luteal phase observations
+- Each patient appears once, randomly assigned to a cycle phase
+- Hypothesis tested via between-patient comparison (follicular group vs luteal group)
+
+**Longitudinal mode:**
+- Files: `output/response-patient-NNNN-obs-NNNN.json`
 - 187 unique patients × 4 observations = **748 total responses**
 - Balanced: ~374 follicular + ~374 luteal phase observations
+- Same patient appears in multiple files with consistent demographics
+- Hypothesis tested via within-patient comparison (repeated measures)
+
+**All outputs:**
+- FHIR R4-compliant with proper resourceType, status, authored timestamp
+- All 10 questionnaire items populated with realistic values
+- LMP dates correctly calculate to assigned cycle phase
 - 64 patients (34%) in intervention subgroup showing improved luteal outcomes
-- Same patient has consistent age/diagnosis/delivery method across all observations
 - Basal insulin and glucose vary by cycle phase and intervention status
 
 ### Phase 2: Advanced Features (UPCOMING)

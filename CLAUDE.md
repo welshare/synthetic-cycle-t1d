@@ -64,50 +64,66 @@ The questionnaire uses standardized LOINC codes for medical terminology and foll
 
 **Architecture:**
 - `src/models/cohort_params.py` - Population parameters and statistical distributions
+- `src/models/cycle_utils.py` - Menstrual cycle phase calculations
 - `src/generators/patient_generator.py` - Demographics and physiological data generation
 - `src/generators/response_builder.py` - FHIR QuestionnaireResponse assembly
 - `src/main.py` - CLI entry point
 
 **Current Capabilities:**
-- Generates FHIR R4-compliant QuestionnaireResponse resources
-- Configurable sample size (default: 20, target: 187)
-- Reproducible generation via random seed (default: 42)
-- Automatic output directory management (`output/`)
-- Demographics: age 18-45, years since diagnosis
-- Insulin delivery: 65% pump, 35% injections
-- Cycle characteristics: LMP dates, regularity patterns
-- Baseline physiological data: basal insulin, nighttime glucose, sleep awakenings, symptoms
+- ✅ Generates FHIR R4-compliant QuestionnaireResponse resources
+- ✅ **Multiple observations per patient** simulating longitudinal survey data
+- ✅ **Cycle phase-aware generation** - follicular vs luteal patterns
+- ✅ **Intervention subgroup** (64 patients with cycle-aware basal adjustment)
+- ✅ **Per-patient stable characteristics** (age, diagnosis, delivery method persist)
+- ✅ **Phase-specific LMP dates** that correctly calculate to target phase
+- ✅ **Physiological differences by phase:**
+  - Luteal: +8.1 mg/dL glucose, +14% insulin, +symptom rates
+  - Intervention: -90% of luteal glucose increase, -10-20% basal dose
+- ✅ Reproducible generation via random seed (default: 42)
+- ✅ Automatic output directory management
 
 **Usage:**
 ```bash
 source venv/bin/activate
-python -m src.main -n 20            # Generate 20 responses
-python -m src.main -n 187           # Generate full cohort
-python -m src.main --seed 99        # Custom random seed
-python -m src.main --no-clean       # Don't delete existing output files
-python -m src.main -o custom/path   # Custom output directory
+
+# Small test cohort (10 patients, 40 observations)
+python -m src.main -p 10 -obs 4
+
+# Full demo cohort (187 patients, 748 observations, 64 intervention)
+python -m src.main -p 187 -obs 4 -i 64
+
+# Custom parameters
+python -m src.main -p 50 -obs 6 -i 20 --seed 99
+
+# Options:
+#   -p, --num-patients           Number of unique patients (default: 10)
+#   -obs, --observations-per-patient  Observations per patient (default: 4)
+#   -i, --intervention-count     Patients in intervention group (default: 34% of patients)
+#   -o, --output-dir             Output directory (default: output/)
+#   --seed                       Random seed (default: 42)
+#   --no-clean                   Don't delete existing output files
 ```
 
 **Outputs:**
-- Individual JSON files: `output/response-patient-NNNN.json`
+- Individual JSON files: `output/response-patient-NNNN-obs-NNNN.json`
 - FHIR-compliant with proper resourceType, status, authored timestamp
 - All 10 questionnaire items populated with realistic values
+- Same patient appears in multiple files with consistent demographics
+- LMP dates vary to reflect different cycle phases at observation time
+
+**Data Characteristics:**
+- 187 unique patients × 4 observations = **748 total responses**
+- Balanced: ~374 follicular + ~374 luteal phase observations
+- 64 patients (34%) in intervention subgroup showing improved luteal outcomes
+- Same patient has consistent age/diagnosis/delivery method across all observations
+- Basal insulin and glucose vary by cycle phase and intervention status
 
 ### Phase 2: Advanced Features (UPCOMING)
-
-**Cycle Phase Simulation:**
-- Generate multiple responses per patient (follicular + luteal observations)
-- Apply phase-specific adjustments to glucose, insulin, symptoms
-- Calculate cycle phase from LMP dates
-- Simulate 2+ complete cycles per patient (~700 total observations)
-
-**Intervention Subgroup:**
-- Mark 64 patients as using cycle-aware basal adjustments
-- Apply improved outcomes: +7.8% TIR, -7.3 mg/dL glucose, stable hypo rate
 
 **Subjective Text Generation:**
 - Replace placeholder text in linkId=10 with realistic patient narratives
 - Vary descriptions based on cycle regularity and symptom patterns
+- Include intervention-aware language for subgroup patients
 
 ### Phase 3: Validation & Analytics (FUTURE)
 

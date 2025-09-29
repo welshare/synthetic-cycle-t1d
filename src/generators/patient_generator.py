@@ -2,7 +2,7 @@
 
 import numpy as np
 from datetime import datetime, timedelta
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from ..models.cohort_params import CohortParameters
 
 
@@ -12,6 +12,7 @@ class PatientGenerator:
     def __init__(self, params: CohortParameters, rng: np.random.Generator):
         self.params = params
         self.rng = rng
+        self._baseline_characteristics = {}  # Cache per-patient stable traits
 
     def generate_age(self) -> int:
         """Generate age within 18-45 range using normal distribution."""
@@ -47,34 +48,111 @@ class PatientGenerator:
             return "Somewhat regular"
         return "Irregular"
 
-    def generate_lmp(self) -> str:
-        """Generate last menstrual period date (within last 35 days)."""
-        days_ago = int(self.rng.integers(1, 36))
-        lmp = datetime.now() - timedelta(days=days_ago)
+    def generate_lmp_for_phase(
+        self, observation_date: datetime, target_phase: str
+    ) -> str:
+        """
+        Generate LMP date that results in target phase at observation time.
+
+        Args:
+            observation_date: When the survey is taken
+            target_phase: "follicular" or "luteal"
+
+        Returns:
+            LMP date as string (YYYY-MM-DD)
+        """
+        if target_phase == "follicular":
+            # Days 1-14: LMP was 0-13 days ago
+            days_ago = int(self.rng.integers(0, 14))
+        else:  # luteal
+            # Days 15-28: LMP was 14-27 days ago
+            days_ago = int(self.rng.integers(14, 28))
+
+        lmp = observation_date - timedelta(days=days_ago)
         return lmp.strftime("%Y-%m-%d")
 
-    def generate_basal_insulin(self) -> float:
-        """Generate baseline basal insulin dose (follicular phase)."""
-        dose = self.rng.normal(
-            self.params.basal_insulin_mean, self.params.basal_insulin_std
-        )
+    def generate_basal_insulin(
+        self, patient_id: str, phase: str, in_intervention: bool = False
+    ) -> float:
+        """
+        Generate basal insulin dose for a specific observation.
+
+        Args:
+            patient_id: Unique patient identifier (for baseline consistency)
+            phase: "follicular" or "luteal"
+            in_intervention: Whether patient uses cycle-aware adjustment
+
+        Returns:
+            Basal insulin dose in units/night
+        """
+        # Get or create patient's baseline follicular dose
+        if patient_id not in self._baseline_characteristics:
+            self._baseline_characteristics[patient_id] = {}
+
+        if "basal_baseline" not in self._baseline_characteristics[patient_id]:
+            baseline = self.rng.normal(
+                self.params.basal_insulin_mean, self.params.basal_insulin_std
+            )
+            baseline = np.clip(
+                baseline, self.params.basal_insulin_min, self.params.basal_insulin_max
+            )
+            self._baseline_characteristics[patient_id]["basal_baseline"] = baseline
+
+        baseline = self._baseline_characteristics[patient_id]["basal_baseline"]
+
+        # Apply phase adjustment
+        if phase == "luteal":
+            if in_intervention:
+                # Intervention patients reduce dose by 10-20%
+                reduction = self.rng.uniform(0.10, 0.20)
+                dose = baseline * (1 - reduction)
+            else:
+                # Non-intervention: increase by ~14%
+                dose = baseline * (1 + self.params.luteal_insulin_increase)
+        else:
+            dose = baseline
+
+        # Add small observation noise
+        dose += self.rng.normal(0, 0.5)
         dose = np.clip(
             dose, self.params.basal_insulin_min, self.params.basal_insulin_max
         )
+
         return round(dose, 1)
 
-    def generate_nighttime_glucose(self, phase: str = "follicular") -> float:
-        """Generate average nighttime CGM glucose (00:00-06:00)."""
+    def generate_nighttime_glucose(
+        self, phase: str, in_intervention: bool = False
+    ) -> float:
+        """
+        Generate average nighttime CGM glucose (00:00-06:00).
+
+        Args:
+            phase: "follicular" or "luteal"
+            in_intervention: Whether patient uses cycle-aware adjustment
+
+        Returns:
+            Glucose level in mg/dL
+        """
         if phase == "follicular":
             glucose = self.rng.normal(
                 self.params.glucose_follicular_mean,
                 self.params.glucose_follicular_std,
             )
         else:  # luteal
-            glucose = self.rng.normal(
-                self.params.glucose_follicular_mean + self.params.luteal_glucose_increase,
-                self.params.glucose_follicular_std,
-            )
+            if in_intervention:
+                # Intervention reduces luteal glucose increase by ~90% (7.3 of 8.1 mg/dL)
+                adjusted_increase = self.params.luteal_glucose_increase * 0.1
+                glucose = self.rng.normal(
+                    self.params.glucose_follicular_mean + adjusted_increase,
+                    self.params.glucose_follicular_std,
+                )
+            else:
+                # Non-intervention: full +8.1 mg/dL increase
+                glucose = self.rng.normal(
+                    self.params.glucose_follicular_mean
+                    + self.params.luteal_glucose_increase,
+                    self.params.glucose_follicular_std,
+                )
         return round(max(50.0, glucose), 1)
 
     def generate_sleep_awakenings(self, phase: str = "follicular") -> int:
@@ -117,20 +195,71 @@ class PatientGenerator:
 
         return symptoms
 
-    def generate_patient_profile(self) -> Dict[str, Any]:
-        """Generate a complete patient profile with baseline characteristics."""
-        age = self.generate_age()
+    def generate_stable_patient_characteristics(self, patient_id: str) -> Dict[str, Any]:
+        """
+        Generate stable patient characteristics that don't change across observations.
 
-        profile = {
-            "age": age,
-            "years_since_diagnosis": self.generate_years_since_diagnosis(age),
-            "insulin_delivery_method": self.generate_insulin_delivery_method(),
-            "lmp": self.generate_lmp(),
-            "cycle_regularity": self.generate_cycle_regularity(),
-            "basal_insulin": self.generate_basal_insulin(),
-            "nighttime_glucose": self.generate_nighttime_glucose("follicular"),
-            "sleep_awakenings": self.generate_sleep_awakenings("follicular"),
-            "symptoms": self.generate_symptoms("follicular"),
+        Args:
+            patient_id: Unique patient identifier
+
+        Returns:
+            Dictionary with age, diagnosis, delivery method, cycle regularity
+        """
+        if patient_id not in self._baseline_characteristics:
+            age = self.generate_age()
+            self._baseline_characteristics[patient_id] = {
+                "age": age,
+                "years_since_diagnosis": self.generate_years_since_diagnosis(age),
+                "insulin_delivery_method": self.generate_insulin_delivery_method(),
+                "cycle_regularity": self.generate_cycle_regularity(),
+            }
+
+        return self._baseline_characteristics[patient_id]
+
+    def generate_observation(
+        self,
+        patient_id: str,
+        observation_date: datetime,
+        target_phase: str,
+        in_intervention: bool = False,
+    ) -> Dict[str, Any]:
+        """
+        Generate a single observation (survey response) for a patient.
+
+        Args:
+            patient_id: Unique patient identifier
+            observation_date: Date when survey was taken
+            target_phase: "follicular" or "luteal"
+            in_intervention: Whether patient is in cycle-aware intervention group
+
+        Returns:
+            Complete observation profile
+        """
+        # Get stable characteristics
+        stable = self.generate_stable_patient_characteristics(patient_id)
+
+        # Generate observation-specific data
+        observation = {
+            "patient_id": patient_id,
+            "observation_date": observation_date.strftime("%Y-%m-%d"),
+            "phase": target_phase,
+            "in_intervention": in_intervention,
+            # Stable characteristics
+            "age": stable["age"],
+            "years_since_diagnosis": stable["years_since_diagnosis"],
+            "insulin_delivery_method": stable["insulin_delivery_method"],
+            "cycle_regularity": stable["cycle_regularity"],
+            # Phase-specific LMP
+            "lmp": self.generate_lmp_for_phase(observation_date, target_phase),
+            # Phase and intervention-specific measurements
+            "basal_insulin": self.generate_basal_insulin(
+                patient_id, target_phase, in_intervention
+            ),
+            "nighttime_glucose": self.generate_nighttime_glucose(
+                target_phase, in_intervention
+            ),
+            "sleep_awakenings": self.generate_sleep_awakenings(target_phase),
+            "symptoms": self.generate_symptoms(target_phase),
         }
 
-        return profile
+        return observation

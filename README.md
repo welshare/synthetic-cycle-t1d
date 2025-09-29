@@ -35,7 +35,32 @@ sample-questionnaire.json  # FHIR Questionnaire definition
 
 ## Usage
 
-*Coming soon: CLI commands for generating synthetic responses*
+Generate synthetic questionnaire responses with multiple observations per patient:
+
+```bash
+# Activate virtual environment
+source venv/bin/activate
+
+# Small test (10 patients, 40 observations)
+python -m src.main -p 10 -obs 4
+
+# Full demo cohort (187 patients, 748 observations, 64 intervention)
+python -m src.main -p 187 -obs 4 -i 64
+```
+
+**CLI Options:**
+- `-p, --num-patients` - Number of unique patients (default: 10, target: 187)
+- `-obs, --observations-per-patient` - Observations per patient (default: 4)
+- `-i, --intervention-count` - Patients in intervention group (default: 34% of patients)
+- `-o, --output-dir` - Output directory (default: output/)
+- `--seed` - Random seed for reproducibility (default: 42)
+- `--no-clean` - Don't delete existing output files
+
+**Key Features:**
+- **Longitudinal data**: Each patient has multiple survey responses at different cycle phases
+- **Phase-aware generation**: Follicular vs luteal differences in glucose, insulin, symptoms
+- **Intervention subgroup**: 64 patients with cycle-aware adjustments show improved outcomes
+- **Stable characteristics**: Same patient maintains consistent demographics across observations
 
 ## Development
 

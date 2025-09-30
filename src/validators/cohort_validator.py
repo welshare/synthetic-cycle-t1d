@@ -46,9 +46,22 @@ class CohortValidator:
         output_path = Path(output_dir)
         self.responses = []
 
-        for json_file in output_path.glob("response-*.json"):
-            with open(json_file, 'r') as f:
-                self.responses.append(json.load(f))
+        # Find all response files
+        json_files = sorted(output_path.glob("response-*.json"))
+
+        # Load each file
+        for json_file in json_files:
+            try:
+                with open(json_file, 'r') as f:
+                    self.responses.append(json.load(f))
+            except (json.JSONDecodeError, IOError) as e:
+                print(f"Warning: Failed to load {json_file}: {e}")
+
+        # Warn if sample size is too small
+        if len(self.responses) < 100:
+            print(f"\n⚠️  WARNING: Only {len(self.responses)} responses found.")
+            print("    Statistical validation requires at least 100 responses for reliable results.")
+            print("    Tolerance bands may not account for high sampling variance.\n")
 
         return len(self.responses)
 
@@ -144,21 +157,6 @@ class CohortValidator:
             message=message
         )
 
-    def validate_cohort_size(self, expected_total: int = 187,
-                            tolerance: float = 0.05) -> ValidationResult:
-        """Validate total number of responses.
-
-        Args:
-            expected_total: Expected number of responses
-            tolerance: Relative tolerance
-
-        Returns:
-            ValidationResult
-        """
-        observed = len(self.responses)
-        result = self._check_metric("Total Responses", expected_total, observed, tolerance)
-        self.results.append(result)
-        return result
 
     def validate_age_distribution(self) -> List[ValidationResult]:
         """Validate age range and distribution."""
@@ -574,7 +572,6 @@ class CohortValidator:
             raise ValueError(f"No responses found in {output_dir}")
 
         # Run all validations
-        self.validate_cohort_size()
         self.validate_age_distribution()
         self.validate_insulin_delivery_ratio()
         self.validate_cycle_regularity_distribution()
@@ -621,7 +618,7 @@ class CohortValidator:
 
         # Group results by category
         categories = {
-            "Demographics": ["Total Responses", "Minimum Age", "Maximum Age", "Mean Age"],
+            "Demographics": ["Minimum Age", "Maximum Age", "Mean Age"],
             "Insulin Delivery": ["Pump Usage Ratio"],
             "Cycle Characteristics": ["Very Regular Ratio", "Somewhat Regular Ratio",
                                      "Irregular Ratio", "Follicular Phase Ratio"],

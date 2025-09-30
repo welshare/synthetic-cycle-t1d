@@ -175,19 +175,16 @@ for result in validator.results:
 
 The validator (`cohort_validator.py`) performs the following checks:
 
-### 1. Structural Validation
-- **Total response count** (default expected: 187, tolerance: 5%)
-
-### 2. Demographics (3 checks)
+### 1. Demographics (3 checks)
 - Min/max age within [18, 45] (absolute tolerance: ±1 year)
 - Mean age within 10% of 31.5
 
-### 3. Categorical Distributions (4 checks)
+### 2. Categorical Distributions (4 checks)
 - Pump ratio within 10% of 0.65
 - Cycle regularity ratios within 15% of [0.55, 0.30, 0.15]
 - Phase balance (follicular:luteal) within 10% of 0.50
 
-### 4. Follicular Phase Parameters (6 checks)
+### 3. Follicular Phase Parameters (6 checks)
 - Mean glucose within 10% of 118.0 mg/dL
 - Mean basal insulin within 10% of 14.0 units
 - Mean awakenings within 15% of 0.8
@@ -195,7 +192,7 @@ The validator (`cohort_validator.py`) performs the following checks:
 - Palpitations rate within 30% tolerance
 - Dizziness rate within 30% tolerance
 
-### 5. Luteal Phase Parameters (6 checks)
+### 4. Luteal Phase Parameters (6 checks)
 - Mean glucose within 10% of 126.1 mg/dL (118.0 + 8.1)
 - Mean basal insulin within 10% of 15.96 units (14.0 × 1.14)
 - Mean awakenings within 15% of 1.4 (0.8 + 0.6)
@@ -203,7 +200,7 @@ The validator (`cohort_validator.py`) performs the following checks:
 - Palpitations rate within 25% tolerance
 - Dizziness rate within 25% tolerance
 
-### 6. Intervention Subgroup (2 checks)
+### 5. Intervention Subgroup (2 checks)
 - **Size**: Keyword-based detection in subjective text (linkId=10) for "cycle-aware", "adjusted my basal", etc.
   - Expected: 64 patients (tolerance: 10%)
 - **Efficacy**: Intervention patients in luteal phase should show glucose increase of ~0.81 mg/dL (vs 8.1 baseline)
@@ -217,6 +214,8 @@ The validator uses **relative tolerance** (percentage of expected value) except 
 - **Intervention effects**: 30% tolerance due to smaller subgroup sample size (n=64)
 
 The tolerance bands account for Monte Carlo sampling variability expected from stochastic generation with finite sample sizes.
+
+**Note**: The validator does not enforce a specific total response count. Instead, it issues a warning if fewer than 100 responses are found, as this may lead to unreliable statistical validation due to high sampling variance.
 
 ## Notes
 

@@ -14,9 +14,13 @@ class PatientGenerator:
         self.rng = rng
         self._baseline_characteristics = {}  # Cache per-patient stable traits
 
-    def generate_age(self) -> int:
-        """Generate age within 18-45 range using normal distribution."""
-        age = self.rng.normal(self.params.age_mean, self.params.age_std)
+    def generate_age(self, shift: float = 0.0) -> int:
+        """Generate age within 18-45 range using normal distribution.
+
+        Args:
+            shift: Optional mean shift for adaptive correction
+        """
+        age = self.rng.normal(self.params.age_mean + shift, self.params.age_std)
         age = np.clip(age, self.params.age_range[0], self.params.age_range[1])
         return int(round(age))
 
@@ -33,9 +37,22 @@ class PatientGenerator:
         )
         return int(round(years))
 
-    def generate_insulin_delivery_method(self) -> str:
-        """Generate insulin delivery method (pump vs injections)."""
-        if self.rng.random() < self.params.pump_ratio:
+    def generate_insulin_delivery_method(self, prefer_pump: bool = False,
+                                         prefer_injection: bool = False) -> str:
+        """Generate insulin delivery method (pump vs injections).
+
+        Args:
+            prefer_pump: If True, bias toward pump selection
+            prefer_injection: If True, bias toward injection selection
+        """
+        pump_prob = self.params.pump_ratio
+
+        if prefer_pump:
+            pump_prob = min(0.95, pump_prob * 1.3)
+        elif prefer_injection:
+            pump_prob = max(0.05, pump_prob * 0.7)
+
+        if self.rng.random() < pump_prob:
             return "Insulin Pump"
         return "Multiple Daily Injections"
 
@@ -72,7 +89,8 @@ class PatientGenerator:
         return lmp.strftime("%Y-%m-%d")
 
     def generate_basal_insulin(
-        self, patient_id: str, phase: str, in_intervention: bool = False
+        self, patient_id: str, phase: str, in_intervention: bool = False,
+        shift: float = 0.0
     ) -> float:
         """
         Generate basal insulin dose for a specific observation.
@@ -81,6 +99,7 @@ class PatientGenerator:
             patient_id: Unique patient identifier (for baseline consistency)
             phase: "follicular" or "luteal"
             in_intervention: Whether patient uses cycle-aware adjustment
+            shift: Optional mean shift for adaptive correction
 
         Returns:
             Basal insulin dose in units/night
@@ -91,7 +110,7 @@ class PatientGenerator:
 
         if "basal_baseline" not in self._baseline_characteristics[patient_id]:
             baseline = self.rng.normal(
-                self.params.basal_insulin_mean, self.params.basal_insulin_std
+                self.params.basal_insulin_mean + shift, self.params.basal_insulin_std
             )
             baseline = np.clip(
                 baseline, self.params.basal_insulin_min, self.params.basal_insulin_max
@@ -109,11 +128,13 @@ class PatientGenerator:
             else:
                 # Non-intervention: increase by ~14%
                 dose = baseline * (1 + self.params.luteal_insulin_increase)
+                # Apply luteal-specific shift if provided
+                dose += shift
         else:
             dose = baseline
 
-        # Add small observation noise
-        dose += self.rng.normal(0, 0.5)
+        # Add small observation noise (reduced for better control)
+        dose += self.rng.normal(0, 0.3)
         dose = np.clip(
             dose, self.params.basal_insulin_min, self.params.basal_insulin_max
         )
@@ -121,7 +142,7 @@ class PatientGenerator:
         return round(dose, 1)
 
     def generate_nighttime_glucose(
-        self, phase: str, in_intervention: bool = False
+        self, phase: str, in_intervention: bool = False, shift: float = 0.0
     ) -> float:
         """
         Generate average nighttime CGM glucose (00:00-06:00).
@@ -129,13 +150,14 @@ class PatientGenerator:
         Args:
             phase: "follicular" or "luteal"
             in_intervention: Whether patient uses cycle-aware adjustment
+            shift: Optional mean shift for adaptive correction
 
         Returns:
             Glucose level in mg/dL
         """
         if phase == "follicular":
             glucose = self.rng.normal(
-                self.params.glucose_follicular_mean,
+                self.params.glucose_follicular_mean + shift,
                 self.params.glucose_follicular_std,
             )
         else:  # luteal
@@ -143,35 +165,47 @@ class PatientGenerator:
                 # Intervention reduces luteal glucose increase by ~90% (7.3 of 8.1 mg/dL)
                 adjusted_increase = self.params.luteal_glucose_increase * 0.1
                 glucose = self.rng.normal(
-                    self.params.glucose_follicular_mean + adjusted_increase,
+                    self.params.glucose_follicular_mean + adjusted_increase + shift,
                     self.params.glucose_follicular_std,
                 )
             else:
                 # Non-intervention: full +8.1 mg/dL increase
                 glucose = self.rng.normal(
                     self.params.glucose_follicular_mean
-                    + self.params.luteal_glucose_increase,
+                    + self.params.luteal_glucose_increase + shift,
                     self.params.glucose_follicular_std,
                 )
         return round(max(50.0, glucose), 1)
 
-    def generate_sleep_awakenings(self, phase: str = "follicular") -> int:
-        """Generate number of nighttime awakenings."""
+    def generate_sleep_awakenings(self, phase: str = "follicular",
+                                  shift: float = 0.0) -> int:
+        """Generate number of nighttime awakenings.
+
+        Args:
+            phase: "follicular" or "luteal"
+            shift: Optional mean shift for adaptive correction
+        """
         if phase == "follicular":
             awakenings = self.rng.normal(
-                self.params.awakenings_follicular_mean,
+                self.params.awakenings_follicular_mean + shift,
                 self.params.awakenings_follicular_std,
             )
         else:  # luteal
             awakenings = self.rng.normal(
                 self.params.awakenings_follicular_mean
-                + self.params.luteal_awakenings_increase,
+                + self.params.luteal_awakenings_increase + shift,
                 self.params.awakenings_follicular_std,
             )
         return int(round(max(0, awakenings)))
 
-    def generate_symptoms(self, phase: str = "follicular") -> list[str]:
-        """Generate nighttime symptoms based on phase-specific probabilities."""
+    def generate_symptoms(self, phase: str = "follicular",
+                         prob_modifiers: dict = None) -> list[str]:
+        """Generate nighttime symptoms based on phase-specific probabilities.
+
+        Args:
+            phase: "follicular" or "luteal"
+            prob_modifiers: Optional dict with probability multipliers for adaptive correction
+        """
         symptoms = []
 
         if phase == "follicular":
@@ -189,28 +223,45 @@ class PatientGenerator:
                 "Weakness/Fatigue": self.params.fatigue_prob_luteal,
             }
 
+        # Apply modifiers if provided
+        if prob_modifiers:
+            for symptom, modifier in prob_modifiers.items():
+                if symptom in probs:
+                    probs[symptom] = np.clip(probs[symptom] * modifier, 0.0, 1.0)
+
         for symptom, prob in probs.items():
             if self.rng.random() < prob:
                 symptoms.append(symptom)
 
         return symptoms
 
-    def generate_stable_patient_characteristics(self, patient_id: str) -> Dict[str, Any]:
+    def generate_stable_patient_characteristics(self, patient_id: str,
+                                                correction_factors: dict = None) -> Dict[str, Any]:
         """
         Generate stable patient characteristics that don't change across observations.
 
         Args:
             patient_id: Unique patient identifier
+            correction_factors: Optional dict with correction factors for adaptive generation
 
         Returns:
             Dictionary with age, diagnosis, delivery method, cycle regularity
         """
         if patient_id not in self._baseline_characteristics:
-            age = self.generate_age()
+            corrections = correction_factors or {}
+
+            age_shift = corrections.get('age_shift', 0.0)
+            age = self.generate_age(shift=age_shift)
+
+            prefer_pump = corrections.get('prefer_pump', False)
+            prefer_injection = corrections.get('prefer_injection', False)
+
             self._baseline_characteristics[patient_id] = {
                 "age": age,
                 "years_since_diagnosis": self.generate_years_since_diagnosis(age),
-                "insulin_delivery_method": self.generate_insulin_delivery_method(),
+                "insulin_delivery_method": self.generate_insulin_delivery_method(
+                    prefer_pump=prefer_pump, prefer_injection=prefer_injection
+                ),
                 "cycle_regularity": self.generate_cycle_regularity(),
             }
 
@@ -222,6 +273,7 @@ class PatientGenerator:
         observation_date: datetime,
         target_phase: str,
         in_intervention: bool = False,
+        correction_factors: dict = None,
     ) -> Dict[str, Any]:
         """
         Generate a single observation (survey response) for a patient.
@@ -231,12 +283,61 @@ class PatientGenerator:
             observation_date: Date when survey was taken
             target_phase: "follicular" or "luteal"
             in_intervention: Whether patient is in cycle-aware intervention group
+            correction_factors: Optional dict with correction factors for adaptive generation
 
         Returns:
             Complete observation profile
         """
+        corrections = correction_factors or {}
+
         # Get stable characteristics
-        stable = self.generate_stable_patient_characteristics(patient_id)
+        stable = self.generate_stable_patient_characteristics(patient_id, corrections)
+
+        # Extract correction shifts
+        glucose_shift = corrections.get(f'{target_phase}_glucose_shift', 0.0)
+
+        # Use phase-specific basal shift
+        if target_phase == 'follicular':
+            basal_shift = corrections.get('basal_insulin_shift', 0.0)
+        else:
+            basal_shift = corrections.get('luteal_basal_shift', 0.0)
+
+        # Build symptom modifiers
+        symptom_mods = {}
+        if target_phase == 'follicular':
+            if 'follicular_sweats_boost' in corrections:
+                symptom_mods['Night sweats'] = corrections['follicular_sweats_boost']
+            elif 'follicular_sweats_reduce' in corrections:
+                symptom_mods['Night sweats'] = corrections['follicular_sweats_reduce']
+
+            if 'follicular_palpitations_boost' in corrections:
+                symptom_mods['Palpitations'] = corrections['follicular_palpitations_boost']
+            elif 'follicular_palpitations_reduce' in corrections:
+                symptom_mods['Palpitations'] = corrections['follicular_palpitations_reduce']
+
+            if 'follicular_dizziness_boost' in corrections:
+                symptom_mods['Dizziness'] = corrections['follicular_dizziness_boost']
+            elif 'follicular_dizziness_reduce' in corrections:
+                symptom_mods['Dizziness'] = corrections['follicular_dizziness_reduce']
+
+            awakenings_shift = corrections.get('follicular_awakenings_shift', 0.0)
+        else:  # luteal
+            if 'luteal_sweats_boost' in corrections:
+                symptom_mods['Night sweats'] = corrections['luteal_sweats_boost']
+            elif 'luteal_sweats_reduce' in corrections:
+                symptom_mods['Night sweats'] = corrections['luteal_sweats_reduce']
+
+            if 'luteal_palpitations_boost' in corrections:
+                symptom_mods['Palpitations'] = corrections['luteal_palpitations_boost']
+            elif 'luteal_palpitations_reduce' in corrections:
+                symptom_mods['Palpitations'] = corrections['luteal_palpitations_reduce']
+
+            if 'luteal_dizziness_boost' in corrections:
+                symptom_mods['Dizziness'] = corrections['luteal_dizziness_boost']
+            elif 'luteal_dizziness_reduce' in corrections:
+                symptom_mods['Dizziness'] = corrections['luteal_dizziness_reduce']
+
+            awakenings_shift = corrections.get('luteal_awakenings_shift', 0.0)
 
         # Generate observation-specific data
         observation = {
@@ -253,13 +354,15 @@ class PatientGenerator:
             "lmp": self.generate_lmp_for_phase(observation_date, target_phase),
             # Phase and intervention-specific measurements
             "basal_insulin": self.generate_basal_insulin(
-                patient_id, target_phase, in_intervention
+                patient_id, target_phase, in_intervention, shift=basal_shift
             ),
             "nighttime_glucose": self.generate_nighttime_glucose(
-                target_phase, in_intervention
+                target_phase, in_intervention, shift=glucose_shift
             ),
-            "sleep_awakenings": self.generate_sleep_awakenings(target_phase),
-            "symptoms": self.generate_symptoms(target_phase),
+            "sleep_awakenings": self.generate_sleep_awakenings(
+                target_phase, shift=awakenings_shift
+            ),
+            "symptoms": self.generate_symptoms(target_phase, prob_modifiers=symptom_mods),
         }
 
         return observation

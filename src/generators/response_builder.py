@@ -36,7 +36,7 @@ class ResponseBuilder:
             self._build_glucose_item(patient_profile["nighttime_glucose"]),
             self._build_awakenings_item(patient_profile["sleep_awakenings"]),
             self._build_symptoms_item(patient_profile["symptoms"]),
-            self._build_subjective_text_item(),
+            self._build_subjective_text_item(patient_profile.get("in_intervention", False)),
         ]
 
         response = QuestionnaireResponse(
@@ -130,16 +130,25 @@ class ResponseBuilder:
             answer=answers if answers else None,
         )
 
-    def _build_subjective_text_item(self) -> QuestionnaireResponseItem:
-        """Build item for subjective experience text (linkId=10)."""
-        # For now, leaving this empty or with placeholder text
+    def _build_subjective_text_item(self, in_intervention: bool = False) -> QuestionnaireResponseItem:
+        """Build item for subjective experience text (linkId=10).
+
+        Args:
+            in_intervention: Whether patient is in cycle-aware intervention group
+        """
+        if in_intervention:
+            text = ("I've been using cycle-aware basal adjustments based on my menstrual phase. "
+                   "Since adjusting my basal rates down during my luteal phase, my glucose levels "
+                   "have been more stable and I've had fewer overnight spikes.")
+        else:
+            text = ("My glucose levels tend to be higher during certain times of the month. "
+                   "I notice more variability in the second half of my cycle.")
+
         return QuestionnaireResponseItem(
             linkId="10",
             text="In your own words, have you noticed changes in glucose stability depending on your menstrual cycle phase?",
             answer=[
-                QuestionnaireResponseItemAnswer(
-                    valueString="My glucose levels tend to be higher during certain times of the month."
-                )
+                QuestionnaireResponseItemAnswer(valueString=text)
             ],
         )
 

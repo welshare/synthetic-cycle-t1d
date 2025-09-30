@@ -11,6 +11,7 @@ from .models.cohort_params import DEFAULT_COHORT_PARAMS, CohortParameters
 from .generators.patient_generator import PatientGenerator
 from .generators.response_builder import ResponseBuilder
 from .generators.cohort_tracker import CohortTracker
+from .retrofit_cohort import retrofit_cohort
 
 
 def clean_output_directory(output_dir: Path) -> None:
@@ -169,6 +170,11 @@ def generate_responses_longitudinal(
     print(f"✓ Saved to: {output_dir}")
     print(f"✓ Random seed: {params.random_seed}")
 
+    # Post-generation retrofitting
+    print(f"\n{'='*80}")
+    retrofit_cohort(output_dir, params, seed=params.random_seed, verbose=True)
+    print(f"{'='*80}")
+
 
 def generate_responses_one_per_patient(
     num_patients: int,
@@ -277,6 +283,11 @@ def generate_responses_one_per_patient(
     tracker.print_summary()
     print(f"✓ Saved to: {output_dir}")
     print(f"✓ Random seed: {params.random_seed}")
+
+    # Post-generation retrofitting
+    print(f"\n{'='*80}")
+    retrofit_cohort(output_dir, params, seed=params.random_seed, verbose=True)
+    print(f"{'='*80}")
 
 
 def generate_responses(

@@ -128,6 +128,7 @@ def generate_responses_longitudinal(
     print(f"\n✓ Successfully generated {total_observations} observations")
     print(f"✓ Unique patients: {num_patients}")
     print(f"✓ Saved to: {output_dir}")
+    print(f"✓ Random seed: {params.random_seed}")
 
 
 def generate_responses_one_per_patient(
@@ -208,6 +209,7 @@ def generate_responses_one_per_patient(
 
     print(f"\n✓ Successfully generated {num_patients} responses (1 per patient)")
     print(f"✓ Saved to: {output_dir}")
+    print(f"✓ Random seed: {params.random_seed}")
 
 
 def generate_responses(
@@ -298,7 +300,7 @@ def main():
         help="Don't clean output directory before generation",
     )
     parser.add_argument(
-        "--seed", type=int, default=42, help="Random seed for reproducibility"
+        "--seed", type=int, default=None, help="Random seed for reproducibility (default: random)"
     )
     parser.add_argument(
         "--one-per-patient",
@@ -312,7 +314,14 @@ def main():
     if args.intervention_count is None:
         args.intervention_count = int(args.num_patients * 0.34)
 
-    # Create custom params with seed if provided
+    # Generate random seed if not provided
+    if args.seed is None:
+        args.seed = np.random.randint(0, 2**31 - 1)
+
+    print(f"🎲 Random seed: {args.seed}")
+    print(f"   (Use --seed {args.seed} to reproduce this cohort)")
+
+    # Create custom params with seed
     params = CohortParameters(random_seed=args.seed)
 
     # Generate responses
